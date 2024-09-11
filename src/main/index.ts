@@ -8,7 +8,7 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             method,
             url,
             headers,
-            connectOptions,
+            connectOptions = {},
             followRedirects,
             proxy,
         } = req;
