@@ -1,17 +1,10 @@
 import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
 import EventEmitter from 'events';
-import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
+import { Agent, Dispatcher, getGlobalDispatcher, ProxyAgent, request } from 'undici';
 
 export const DEFAULT_CONNECT_TIMEOUT = 30 * 1000;
 export const DEFAULT_BODY_TIMEOUT = 120 * 1000;
-
-export const defaultDispatcher = new Agent({
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
-    connect: {
-        timeout: DEFAULT_CONNECT_TIMEOUT,
-    }
-});
 
 export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: any) => {
     try {
@@ -61,9 +54,9 @@ function getDispatcher(opts: { proxy?: string; timeout?: number; connectOptions:
         return new ProxyAgent({
             uri: opts.proxy,
             token: auth,
-            bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
+            // bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
-                timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
+                // timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
                 ...connectOptions
             },
         });
@@ -71,14 +64,14 @@ function getDispatcher(opts: { proxy?: string; timeout?: number; connectOptions:
     const useCustomAgent = opts.timeout != null || Object.keys(connectOptions).length > 0;
     if (useCustomAgent) {
         return new Agent({
-            bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
+            // bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
-                timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
+                // timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
                 ...connectOptions,
             },
         });
     }
-    return defaultDispatcher;
+    return getGlobalDispatcher();
 }
 
 function makeBasicAuth(username: string, password: string) {
