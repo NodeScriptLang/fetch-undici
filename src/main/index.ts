@@ -24,7 +24,7 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             timeout = 120_000,
             connectOptions = {},
         } = req;
-        const dispatcher = getDispatcher({ proxy, connectOptions });
+        const dispatcher = getDispatcher({ proxy, timeout, connectOptions });
         const maxRedirections = followRedirects ? 10 : 0;
         const reqHeaders = filterHeaders({
             'user-agent': 'NodeScript / Fetch v1',
@@ -53,29 +53,27 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
     }
 };
 
-function getDispatcher(opts: { proxy?: string; connectOptions: Record<string, any> }): Dispatcher {
+function getDispatcher(opts: { proxy?: string; timeout?: number, connectOptions: Record<string, any> }): Dispatcher {
     const connectOptions = opts.connectOptions ?? {};
-    const {
-        bodyTimeout = DEFAULT_BODY_TIMEOUT,
-    } = connectOptions;
     if (opts.proxy) {
         const proxyUrl = new URL(opts.proxy);
         const auth = (proxyUrl.username || proxyUrl.password) ? makeBasicAuth(proxyUrl.username, proxyUrl.password) : undefined;
         return new ProxyAgent({
             uri: opts.proxy,
             token: auth,
-            bodyTimeout,
+            bodyTimeout: opts.timeout,
             connect: {
-                timeout: DEFAULT_CONNECT_TIMEOUT,
+                timeout: opts.timeout,
                 ...connectOptions
             },
         });
     }
-    if (Object.keys(connectOptions).length > 0) {
+    const useCustomAgent = opts.timeout != null || Object.keys(connectOptions).length > 0;
+    if (useCustomAgent) {
         return new Agent({
-            bodyTimeout,
+            bodyTimeout: opts.timeout,
             connect: {
-                timeout: DEFAULT_CONNECT_TIMEOUT,
+                timeout: opts.timeout,
                 ...connectOptions,
             },
         });
