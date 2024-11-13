@@ -46,6 +46,9 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             body: res.body,
         };
     } catch (error: any) {
+        if (error.code === 'UND_ERR_ABORTED') {
+            throw new FetchError('Request timeout', 'ERR_TIMEOUT');
+        }
         throw new FetchError(error.message, error.code);
     }
 };
