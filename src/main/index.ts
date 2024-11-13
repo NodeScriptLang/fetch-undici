@@ -1,5 +1,6 @@
 import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
+import EventEmitter from 'events';
 import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
 
 export const DEFAULT_CONNECT_TIMEOUT = 30 * 1000;
@@ -18,9 +19,10 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             method,
             url,
             headers,
-            connectOptions = {},
-            followRedirects,
             proxy,
+            followRedirects,
+            timeout = 120_000,
+            connectOptions = {},
         } = req;
         const dispatcher = getDispatcher({ proxy, connectOptions });
         const maxRedirections = followRedirects ? 10 : 0;
@@ -28,12 +30,15 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             'user-agent': 'NodeScript / Fetch v1',
             ...headers
         });
+        const abortSignal = new EventEmitter();
+        setTimeout(() => abortSignal.emit('abort'), timeout).unref();
         const res = await request(url, {
             dispatcher,
             method,
             headers: reqHeaders,
             body,
             maxRedirections,
+            signal: abortSignal,
         });
         return {
             status: res.statusCode,
