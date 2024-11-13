@@ -53,7 +53,7 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
     }
 };
 
-function getDispatcher(opts: { proxy?: string; timeout?: number, connectOptions: Record<string, any> }): Dispatcher {
+function getDispatcher(opts: { proxy?: string; timeout?: number; connectOptions: Record<string, any> }): Dispatcher {
     const connectOptions = opts.connectOptions ?? {};
     if (opts.proxy) {
         const proxyUrl = new URL(opts.proxy);
@@ -61,9 +61,9 @@ function getDispatcher(opts: { proxy?: string; timeout?: number, connectOptions:
         return new ProxyAgent({
             uri: opts.proxy,
             token: auth,
-            bodyTimeout: opts.timeout,
+            bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
-                timeout: opts.timeout,
+                timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
                 ...connectOptions
             },
         });
@@ -71,9 +71,9 @@ function getDispatcher(opts: { proxy?: string; timeout?: number, connectOptions:
     const useCustomAgent = opts.timeout != null || Object.keys(connectOptions).length > 0;
     if (useCustomAgent) {
         return new Agent({
-            bodyTimeout: opts.timeout,
+            bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
-                timeout: opts.timeout,
+                timeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
                 ...connectOptions,
             },
         });
