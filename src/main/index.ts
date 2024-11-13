@@ -1,6 +1,16 @@
 import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
-import { Agent, Dispatcher, getGlobalDispatcher, ProxyAgent, request } from 'undici';
+import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
+
+export const DEFAULT_CONNECT_TIMEOUT = 30 * 1000;
+export const DEFAULT_BODY_TIMEOUT = 120 * 1000;
+
+export const defaultDispatcher = new Agent({
+    bodyTimeout: DEFAULT_BODY_TIMEOUT,
+    connect: {
+        timeout: DEFAULT_CONNECT_TIMEOUT,
+    }
+});
 
 export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: any) => {
     try {
@@ -35,26 +45,34 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
     }
 };
 
-function getDispatcher(opts: { proxy?: string; connectOptions: object }): Dispatcher {
+function getDispatcher(opts: { proxy?: string; connectOptions: Record<string, any> }): Dispatcher {
+    const connectOptions = opts.connectOptions ?? {};
+    const {
+        bodyTimeout = DEFAULT_BODY_TIMEOUT,
+    } = connectOptions;
     if (opts.proxy) {
         const proxyUrl = new URL(opts.proxy);
         const auth = (proxyUrl.username || proxyUrl.password) ? makeBasicAuth(proxyUrl.username, proxyUrl.password) : undefined;
         return new ProxyAgent({
             uri: opts.proxy,
             token: auth,
+            bodyTimeout,
             connect: {
-                ...opts.connectOptions
+                timeout: DEFAULT_CONNECT_TIMEOUT,
+                ...connectOptions
             },
         });
     }
-    if (Object.keys(opts.connectOptions).length > 0) {
+    if (Object.keys(connectOptions).length > 0) {
         return new Agent({
+            bodyTimeout,
             connect: {
-                ...opts.connectOptions,
+                timeout: DEFAULT_CONNECT_TIMEOUT,
+                ...connectOptions,
             },
         });
     }
-    return getGlobalDispatcher();
+    return defaultDispatcher;
 }
 
 function makeBasicAuth(username: string, password: string) {
