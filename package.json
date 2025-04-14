@@ -36,12 +36,13 @@
         "@types/mocha": "^8.2.3",
         "@types/node": "^16.18.87",
         "eslint": "^8.57.0",
-        "mocha": "^9.2.2",
-        "pre-commit": "^1.2.2",
+        "mocha": "^11.1.0",
+        "pre-commit": "^1.0.10",
         "typescript": "^5.5.2"
     },
     "dependencies": {
         "@nodescript/core": "^7.25.2",
+        "cacheable-lookup": "^7.0.0",
         "undici": "^6.19.2"
     }
 }

@@ -1,7 +1,14 @@
 import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
+import CacheableLookup from 'cacheable-lookup';
 import { EventEmitter } from 'events';
+import { LookupFunction } from 'net';
 import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
+
+const dnsLookupCache = new CacheableLookup({
+    maxTtl: 60,
+});
+const dnsLookupFn = dnsLookupCache.lookup.bind(dnsLookupCache) as LookupFunction;
 
 export const DEFAULT_CONNECT_TIMEOUT = 30_000;
 export const DEFAULT_BODY_TIMEOUT = 120_000;
@@ -10,6 +17,9 @@ export const defaultDispatcher = new Agent({
     connectTimeout: DEFAULT_CONNECT_TIMEOUT,
     bodyTimeout: DEFAULT_BODY_TIMEOUT,
     keepAliveTimeout: DEFAULT_BODY_TIMEOUT,
+    connect: {
+        lookup: dnsLookupFn,
+    },
 });
 
 export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: any) => {
@@ -68,7 +78,8 @@ function getDispatcher(opts: {
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             keepAliveTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
-                ...connectOptions
+                lookup: dnsLookupFn,
+                ...connectOptions,
             },
         });
     }
@@ -80,6 +91,7 @@ function getDispatcher(opts: {
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             keepAliveTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             connect: {
+                lookup: dnsLookupFn,
                 ...connectOptions,
             },
         });
