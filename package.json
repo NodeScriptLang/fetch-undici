@@ -1,6 +1,6 @@
 {
     "name": "@nodescript/fetch-undici",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "description": "Unified fetch implementation using Node.js + Undici",
     "type": "module",
     "sideEffects": false,
