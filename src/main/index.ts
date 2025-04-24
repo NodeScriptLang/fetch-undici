@@ -15,6 +15,19 @@ const dispatcherCache = new LRUCache<string, Dispatcher>({
     max: 1000,
 });
 
+export const fetchStats = {
+    dispatcherCache: {
+        hits: 0,
+        misses: 0,
+    },
+    requests: {
+        total: 0,
+        failed: 0,
+        timeout: 0,
+        byStatus: {} as Record<number, number>,
+    },
+};
+
 export const DEFAULT_CONNECT_TIMEOUT = 30_000;
 export const DEFAULT_BODY_TIMEOUT = 120_000;
 export const DEFAULT_KEEP_ALIVE_TIMEOUT = 30_000;
@@ -55,6 +68,7 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             maxRedirections,
             signal,
         });
+        incrStatus(res.statusCode);
         return {
             status: res.statusCode,
             headers: filterHeaders(res.headers),
@@ -62,9 +76,13 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
         };
     } catch (error: any) {
         if (error.code === 'UND_ERR_ABORTED') {
+            fetchStats.requests.timeout += 1;
             throw new FetchError('Request timeout', 'ERR_TIMEOUT');
         }
+        fetchStats.requests.failed += 1;
         throw new FetchError(error.message, error.code);
+    } finally {
+        fetchStats.requests.total += 1;
     }
 };
 
@@ -76,8 +94,10 @@ function getDispatcher(opts: {
     const dispatcherKey = JSON.stringify({ proxy: opts.proxy, connectOptions: opts.connectOptions });
     const existing = dispatcherCache.get(dispatcherKey);
     if (existing) {
+        fetchStats.dispatcherCache.hits += 1;
         return existing;
     }
+    fetchStats.dispatcherCache.misses += 1;
     const dispatcher = createDispatcher(opts);
     dispatcherCache.set(dispatcherKey, dispatcher);
     return dispatcher;
@@ -133,4 +153,9 @@ function filterHeaders(headers: Record<string, string | string[] | undefined>) {
         result[k.toLowerCase()] = v;
     }
     return result;
+}
+
+function incrStatus(status: number) {
+    const stats = fetchStats.requests.byStatus[status] ?? 0;
+    fetchStats.requests.byStatus[status] = stats + 1;
 }
