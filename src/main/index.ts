@@ -1,32 +1,15 @@
 import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
-import CacheableLookup from 'cacheable-lookup';
 import { EventEmitter } from 'events';
 import { LRUCache } from 'lru-cache';
-import { LookupFunction } from 'net';
 import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
 
-const dnsLookupCache = new CacheableLookup({
-    maxTtl: 120,
-});
-const dnsLookupFn = dnsLookupCache.lookup.bind(dnsLookupCache) as LookupFunction;
+import { cachedDnsLookup } from './dns-cache.js';
+import { fetchMetrics } from './metrics.js';
 
 const dispatcherCache = new LRUCache<string, Dispatcher>({
     max: 1000,
 });
-
-export const fetchStats = {
-    dispatcherCache: {
-        hits: 0,
-        misses: 0,
-    },
-    requests: {
-        total: 0,
-        failed: 0,
-        timeout: 0,
-        byStatus: {} as Record<number, number>,
-    },
-};
 
 export const DEFAULT_CONNECT_TIMEOUT = 30_000;
 export const DEFAULT_BODY_TIMEOUT = 120_000;
@@ -37,7 +20,7 @@ export const defaultDispatcher = new Agent({
     bodyTimeout: DEFAULT_BODY_TIMEOUT,
     keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
     connect: {
-        lookup: dnsLookupFn,
+        lookup: cachedDnsLookup,
     },
 });
 
@@ -59,7 +42,7 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             ...headers
         });
         const signal = new EventEmitter();
-        setTimeout(() => signal.emit('abort'), timeout).unref();
+        const timer = setTimeout(() => signal.emit('abort'), timeout).unref();
         const res = await request(url, {
             dispatcher,
             method,
@@ -68,7 +51,8 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             maxRedirections,
             signal,
         });
-        incrStatus(res.statusCode);
+        clearTimeout(timer);
+        fetchMetrics.requests.sent.incr(1, { status: res.statusCode });
         return {
             status: res.statusCode,
             headers: filterHeaders(res.headers),
@@ -76,13 +60,13 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
         };
     } catch (error: any) {
         if (error.code === 'UND_ERR_ABORTED') {
-            fetchStats.requests.timeout += 1;
+            fetchMetrics.requests.timeout.incr();
             throw new FetchError('Request timeout', 'ERR_TIMEOUT');
         }
-        fetchStats.requests.failed += 1;
+        fetchMetrics.requests.failed.incr(1, { error: error.code ?? error.message });
         throw new FetchError(error.message, error.code);
     } finally {
-        fetchStats.requests.total += 1;
+        fetchMetrics.requests.total.incr();
     }
 };
 
@@ -94,10 +78,10 @@ function getDispatcher(opts: {
     const dispatcherKey = JSON.stringify({ proxy: opts.proxy, connectOptions: opts.connectOptions });
     const existing = dispatcherCache.get(dispatcherKey);
     if (existing) {
-        fetchStats.dispatcherCache.hits += 1;
+        fetchMetrics.dispatcherCache.hits.incr();
         return existing;
     }
-    fetchStats.dispatcherCache.misses += 1;
+    fetchMetrics.dispatcherCache.misses.incr();
     const dispatcher = createDispatcher(opts);
     dispatcherCache.set(dispatcherKey, dispatcher);
     return dispatcher;
@@ -119,7 +103,7 @@ function createDispatcher(opts: {
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
             connect: {
-                lookup: dnsLookupFn,
+                lookup: cachedDnsLookup,
                 ...connectOptions,
             },
         });
@@ -132,7 +116,7 @@ function createDispatcher(opts: {
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
             keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
             connect: {
-                lookup: dnsLookupFn,
+                lookup: cachedDnsLookup,
                 ...connectOptions,
             },
         });
@@ -153,9 +137,4 @@ function filterHeaders(headers: Record<string, string | string[] | undefined>) {
         result[k.toLowerCase()] = v;
     }
     return result;
-}
-
-function incrStatus(status: number) {
-    const stats = fetchStats.requests.byStatus[status] ?? 0;
-    fetchStats.requests.byStatus[status] = stats + 1;
 }
