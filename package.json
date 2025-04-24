@@ -16,7 +16,7 @@
         "clean": "rm -rf out *.tsbuildinfo",
         "dev": "tsc -b -w",
         "compile": "tsc -b",
-        "lint": "eslint --ext=.js,.ts,.vue --cache .",
+        "lint": "eslint --cache .",
         "test": "NODE_ENV=test mocha",
         "version": "npm run compile",
         "postversion": "npm publish --access=public && git push --tags origin main"
@@ -32,10 +32,10 @@
     "author": "Boris Okunskiy",
     "license": "ISC",
     "devDependencies": {
-        "@nodescript/eslint-config": "^1.2.0",
+        "@nodescript/eslint-config": "^2.1.0",
         "@types/mocha": "^8.2.3",
         "@types/node": "^16.18.87",
-        "eslint": "^8.57.0",
+        "eslint": "^9.25.1",
         "mocha": "^11.1.0",
         "pre-commit": "^1.0.10",
         "typescript": "^5.5.2"
