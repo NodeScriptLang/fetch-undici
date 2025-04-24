@@ -2,10 +2,10 @@ import { CounterMetric } from '@nodescript/metrics';
 
 export const fetchMetrics = {
     requests: {
-        total: new CounterMetric('fetch_requests_total', 'Total number of requests'),
-        sent: new CounterMetric<{ status: number }>('fetch_requests_sent', 'Total number of requests sent'),
-        failed: new CounterMetric<{ error: string }>('fetch_requests_failed', 'Total number of requests that failed'),
-        timeout: new CounterMetric('fetch_requests_timeout', 'Total number of requests that timed out'),
+        total: new CounterMetric<{ host: string; proxyHost: string }>('fetch_requests_total', 'Total number of requests'),
+        sent: new CounterMetric<{ status: number; host: string; proxyHost: string }>('fetch_requests_sent', 'Total number of requests sent'),
+        failed: new CounterMetric<{ error: string; host: string; proxyHost: string }>('fetch_requests_failed', 'Total number of requests that failed'),
+        timeout: new CounterMetric<{ host: string; proxyHost: string }>('fetch_requests_timeout', 'Total number of requests that timed out'),
     },
     dispatcherCache: {
         hits: new CounterMetric('fetch_dispatcher_cache_hits', 'Total number of dispatcher cache hits'),

@@ -25,16 +25,18 @@ export const defaultDispatcher = new Agent({
 });
 
 export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: any) => {
+    const {
+        method,
+        url,
+        headers,
+        connectOptions = {},
+        followRedirects,
+        proxy,
+        timeout = DEFAULT_BODY_TIMEOUT,
+    } = req;
+    const host = new URL(url).host;
+    const proxyHost = proxy ? new URL(proxy).host : undefined;
     try {
-        const {
-            method,
-            url,
-            headers,
-            connectOptions = {},
-            followRedirects,
-            proxy,
-            timeout = DEFAULT_BODY_TIMEOUT,
-        } = req;
         const dispatcher = getDispatcher({ proxy, connectOptions, timeout });
         const maxRedirections = followRedirects ? 10 : 0;
         const reqHeaders = filterHeaders({
@@ -52,7 +54,11 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
             signal,
         });
         clearTimeout(timer);
-        fetchMetrics.requests.sent.incr(1, { status: res.statusCode });
+        fetchMetrics.requests.sent.incr(1, {
+            status: res.statusCode,
+            host,
+            proxyHost: proxyHost ?? 'direct',
+        });
         return {
             status: res.statusCode,
             headers: filterHeaders(res.headers),
@@ -60,10 +66,17 @@ export const fetchUndici: FetchFunction = async (req: FetchRequestSpec, body?: a
         };
     } catch (error: any) {
         if (error.code === 'UND_ERR_ABORTED') {
-            fetchMetrics.requests.timeout.incr();
+            fetchMetrics.requests.timeout.incr(1, {
+                host,
+                proxyHost: proxyHost ?? 'direct',
+            });
             throw new FetchError('Request timeout', 'ERR_TIMEOUT');
         }
-        fetchMetrics.requests.failed.incr(1, { error: error.code ?? error.message });
+        fetchMetrics.requests.failed.incr(1, {
+            error: error.code ?? error.message,
+            host,
+            proxyHost: proxyHost ?? 'direct',
+        });
         throw new FetchError(error.message, error.code);
     } finally {
         fetchMetrics.requests.total.incr();
