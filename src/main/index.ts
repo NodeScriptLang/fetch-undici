@@ -2,21 +2,27 @@ import { FetchFunction, FetchRequestSpec } from '@nodescript/core/types';
 import { FetchError } from '@nodescript/core/util';
 import CacheableLookup from 'cacheable-lookup';
 import { EventEmitter } from 'events';
+import { LRUCache } from 'lru-cache';
 import { LookupFunction } from 'net';
 import { Agent, Dispatcher, ProxyAgent, request } from 'undici';
 
 const dnsLookupCache = new CacheableLookup({
-    maxTtl: 60,
+    maxTtl: 120,
 });
 const dnsLookupFn = dnsLookupCache.lookup.bind(dnsLookupCache) as LookupFunction;
 
+const dispatcherCache = new LRUCache<string, Dispatcher>({
+    max: 1000,
+});
+
 export const DEFAULT_CONNECT_TIMEOUT = 30_000;
 export const DEFAULT_BODY_TIMEOUT = 120_000;
+export const DEFAULT_KEEP_ALIVE_TIMEOUT = 30_000;
 
 export const defaultDispatcher = new Agent({
     connectTimeout: DEFAULT_CONNECT_TIMEOUT,
     bodyTimeout: DEFAULT_BODY_TIMEOUT,
-    keepAliveTimeout: DEFAULT_BODY_TIMEOUT,
+    keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
     connect: {
         lookup: dnsLookupFn,
     },
@@ -66,6 +72,21 @@ function getDispatcher(opts: {
     proxy?: string;
     timeout?: number;
     connectOptions?: Record<string, any>;
+}) {
+    const dispatcherKey = JSON.stringify({ proxy: opts.proxy, connectOptions: opts.connectOptions });
+    const existing = dispatcherCache.get(dispatcherKey);
+    if (existing) {
+        return existing;
+    }
+    const dispatcher = createDispatcher(opts);
+    dispatcherCache.set(dispatcherKey, dispatcher);
+    return dispatcher;
+}
+
+function createDispatcher(opts: {
+    proxy?: string;
+    timeout?: number;
+    connectOptions?: Record<string, any>;
 }): Dispatcher {
     const connectOptions = opts.connectOptions ?? {};
     if (opts.proxy) {
@@ -76,7 +97,7 @@ function getDispatcher(opts: {
             token: auth,
             connectTimeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
-            keepAliveTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
+            keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
             connect: {
                 lookup: dnsLookupFn,
                 ...connectOptions,
@@ -89,7 +110,7 @@ function getDispatcher(opts: {
         return new Agent({
             connectTimeout: opts.timeout ?? DEFAULT_CONNECT_TIMEOUT,
             bodyTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
-            keepAliveTimeout: opts.timeout ?? DEFAULT_BODY_TIMEOUT,
+            keepAliveTimeout: DEFAULT_KEEP_ALIVE_TIMEOUT,
             connect: {
                 lookup: dnsLookupFn,
                 ...connectOptions,

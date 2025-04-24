@@ -43,6 +43,7 @@
     "dependencies": {
         "@nodescript/core": "^7.25.2",
         "cacheable-lookup": "^7.0.0",
+        "lru-cache": "^11.1.0",
         "undici": "^6.19.2"
     }
 }
